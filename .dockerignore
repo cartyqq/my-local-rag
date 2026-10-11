@@ -1,0 +1,19 @@
+# Version control history (not needed inside the image)
+.git
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local vector database: mounted as a volume at runtime, never baked into the image
+chroma_db/
+
+# Personal documents and logs
+data/
+
+# Secrets and local environment settings
+.env
+
+# Virtual environments (the image installs its own dependencies)
+venv/
+.venv/

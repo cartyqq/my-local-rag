@@ -5,7 +5,7 @@ Stack: PyPDFLoader / RecursiveCharacterTextSplitter -> all-MiniLM-L6-v2 ->
 ChromaDB (local) -> Ollama (http://localhost:11434/api/generate).
 
 Installation (Miniconda):
-    conda create -n rag python=3.11 -y
+    conda create -n rag python=3.10 -y
     conda activate rag
     pip install streamlit requests pypdf chromadb sentence-transformers \
                 langchain-community langchain-text-splitters \
@@ -13,7 +13,7 @@ Installation (Miniconda):
 
 Run:
     ollama serve            # if the server is not running yet
-    ollama pull llama3.2
+    ollama pull qwen2.5:3b
     streamlit run app.py
 """
 
@@ -37,10 +37,10 @@ EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
-OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
 OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
-DEFAULT_MODEL = "llama3.2"
+DEFAULT_MODEL = "qwen2.5:3b"
 
 HISTORY_TURNS = 4  # how many recent messages to include in the prompt
 
@@ -239,7 +239,7 @@ with st.sidebar:
         st.error("Ollama недоступна. Запустите `ollama serve`.")
         model = st.text_input("Модель Ollama", value=DEFAULT_MODEL)
     elif not models:
-        st.warning("В Ollama нет моделей. Выполните `ollama pull llama3.2`.")
+        st.warning(f"В Ollama нет моделей. Выполните `ollama pull {DEFAULT_MODEL}`.")
         model = st.text_input("Модель Ollama", value=DEFAULT_MODEL)
     else:
         idx = next((i for i, m in enumerate(models) if m.startswith(DEFAULT_MODEL)), 0)

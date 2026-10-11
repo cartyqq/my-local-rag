@@ -7,7 +7,7 @@ Install dependencies:
                 langchain-chroma chromadb sentence-transformers pypdf requests
 
 Ollama must be running and the model must be pulled before launching:
-    ollama pull llama3.2
+    ollama pull qwen2.5:3b
 
 Examples:
     # index a PDF
@@ -20,6 +20,7 @@ Examples:
     python main.py chat --pdf document.pdf
 """
 
+import os
 import argparse
 import sys
 
@@ -31,14 +32,15 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # ------------------------------- Settings -----------------------------------
 CHROMA_DIR = "./chroma_db"
-COLLECTION_NAME = "pdf_docs"
+COLLECTION_NAME = "rag_docs"  # same collection as app.py, so both share one database
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
+# Larger chunks to capture long tracebacks and Docker logs
+CHUNK_SIZE = 1500
+CHUNK_OVERLAP = 300
 TOP_K = 4
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/api/generate"
 OLLAMA_MODEL = "qwen2.5:3b"
 
 PROMPT_TEMPLATE = """Ты — Senior DevOps инженер. Твоя задача — проанализировать технические логи, найти причину падения (ошибку) и предложить конкретные шаги для её исправления.
@@ -71,11 +73,10 @@ def load_and_split(log_path: str):
     loader = TextLoader(log_path, encoding="utf-8")
     pages = loader.load()
 
-    # Larger chunk size to capture long tracebacks and Docker logs
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,
-        chunk_overlap=300,
-        separators=["\n\n", "\n", " "] 
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        separators=["\n\n", "\n", " "],
     )
     chunks = splitter.split_documents(pages)
     print(f"Лог загружен, разбито на блоков: {len(chunks)}")
@@ -124,7 +125,8 @@ def answer_question(question: str) -> str:
         return "База пуста. Сначала проиндексируйте PDF командой `index`."
 
     context = "\n\n---\n\n".join(
-        f"[стр. {d.metadata.get('page', 0) + 1}] {d.page_content}" for d in docs
+        f"[{os.path.basename(d.metadata.get('source', '?'))}] {d.page_content}"
+        for d in docs
     )
     prompt = PROMPT_TEMPLATE.format(context=context, question=question)
     return ask_ollama(prompt)

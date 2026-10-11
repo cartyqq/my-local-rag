@@ -11,7 +11,7 @@ miniconda3/
 # Vector database
 chroma_db/
 
-# Data files (опционально, если не хотите делиться личными PDF)
+# Data files
 data/*.pdf
 data/*.txt
 data/*.log
