@@ -1,18 +1,18 @@
 """
-Streamlit-интерфейс для локальной RAG-системы.
+Streamlit interface for a local RAG system.
 
-Стек: PyPDFLoader / RecursiveCharacterTextSplitter -> all-MiniLM-L6-v2 ->
-ChromaDB (локально) -> Ollama (http://localhost:11434/api/generate).
+Stack: PyPDFLoader / RecursiveCharacterTextSplitter -> all-MiniLM-L6-v2 ->
+ChromaDB (local) -> Ollama (http://localhost:11434/api/generate).
 
-Установка (Miniconda):
+Installation (Miniconda):
     conda create -n rag python=3.11 -y
     conda activate rag
     pip install streamlit requests pypdf chromadb sentence-transformers \
                 langchain-community langchain-text-splitters \
                 langchain-huggingface langchain-chroma
 
-Запуск:
-    ollama serve            # если сервер ещё не запущен
+Run:
+    ollama serve            # if the server is not running yet
     ollama pull llama3.2
     streamlit run app.py
 """
@@ -29,7 +29,7 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# ----------------------------- Настройки ------------------------------------
+# ------------------------------- Settings -----------------------------------
 CHROMA_DIR = "./chroma_db"
 COLLECTION_NAME = "rag_docs"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -42,7 +42,7 @@ OLLAMA_GENERATE_URL = f"{OLLAMA_BASE_URL}/api/generate"
 OLLAMA_TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
 DEFAULT_MODEL = "llama3.2"
 
-HISTORY_TURNS = 4  # сколько последних сообщений добавлять в промпт
+HISTORY_TURNS = 4  # how many recent messages to include in the prompt
 
 PROMPT_TEMPLATE = """Ты — помощник, отвечающий на вопросы по загруженным документам и логам.
 Используй ТОЛЬКО приведённый ниже контекст. Если в контексте нет ответа,
@@ -56,7 +56,7 @@ PROMPT_TEMPLATE = """Ты — помощник, отвечающий на воп
 Ответ:"""
 
 
-# ------------------------- Ресурсы (кэшируются) -----------------------------
+# ------------------------- Resources (cached) -------------------------------
 @st.cache_resource(show_spinner="Загрузка модели эмбеддингов…")
 def get_embeddings() -> HuggingFaceEmbeddings:
     return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
@@ -72,16 +72,16 @@ def get_vectorstore() -> Chroma:
 
 
 def db_count() -> int:
-    """Количество кусков в базе."""
+    """Number of chunks in the database."""
     try:
         return get_vectorstore()._collection.count()
     except Exception:
         return 0
 
 
-# ------------------------------ Ollama --------------------------------------
+# ------------------------------- Ollama -------------------------------------
 def list_ollama_models() -> list[str] | None:
-    """Список моделей Ollama или None, если сервер недоступен."""
+    """List of Ollama models, or None if the server is unavailable."""
     try:
         r = requests.get(OLLAMA_TAGS_URL, timeout=3)
         r.raise_for_status()
@@ -91,7 +91,7 @@ def list_ollama_models() -> list[str] | None:
 
 
 def stream_ollama(prompt: str, model: str):
-    """Генератор токенов ответа от Ollama (POST с stream=True)."""
+    """Generator of response tokens from Ollama (POST with stream=True)."""
     with requests.post(
         OLLAMA_GENERATE_URL,
         json={"model": model, "prompt": prompt, "stream": True},
@@ -114,9 +114,9 @@ def stream_ollama(prompt: str, model: str):
                 break
 
 
-# ------------------------ Загрузка и индексация -----------------------------
+# ------------------------- Loading and indexing -----------------------------
 def load_documents(uploaded_file) -> list[Document]:
-    """Загружает PDF (PyPDFLoader) или текстовый/лог-файл."""
+    """Load a PDF (PyPDFLoader) or a plain-text/log file."""
     name = uploaded_file.name
     ext = os.path.splitext(name)[1].lower()
     raw = uploaded_file.getvalue()
@@ -139,7 +139,7 @@ def load_documents(uploaded_file) -> list[Document]:
 
 
 def index_file(uploaded_file) -> int:
-    """Режет файл на куски, векторизует и сохраняет в ChromaDB."""
+    """Split the file into chunks, embed them and save to ChromaDB."""
     docs = load_documents(uploaded_file)
     docs = [d for d in docs if d.page_content.strip()]
     if not docs:
@@ -155,7 +155,7 @@ def index_file(uploaded_file) -> int:
     chunks = splitter.split_documents(docs)
 
     db = get_vectorstore()
-    # Убираем старую версию этого файла, чтобы не плодить дубли
+    # Remove the old version of this file to avoid duplicates
     db._collection.delete(where={"source": uploaded_file.name})
     db.add_documents(chunks)
     return len(chunks)
@@ -168,7 +168,7 @@ def clear_database() -> None:
         db._collection.delete(ids=ids)
 
 
-# ------------------------------- RAG ----------------------------------------
+# --------------------------------- RAG --------------------------------------
 def build_prompt(question: str, docs: list[Document], history: list[dict]) -> str:
     context = "\n\n---\n\n".join(
         f"[{d.metadata.get('source', '?')}"
@@ -188,7 +188,7 @@ def build_prompt(question: str, docs: list[Document], history: list[dict]) -> st
     return PROMPT_TEMPLATE.format(history=hist_text, context=context, question=question)
 
 
-# --------------------------------- UI ---------------------------------------
+# ---------------------------------- UI --------------------------------------
 st.set_page_config(page_title="Локальный RAG-чат", page_icon="💬", layout="wide")
 
 if "messages" not in st.session_state:
@@ -196,7 +196,7 @@ if "messages" not in st.session_state:
 if "indexed_files" not in st.session_state:
     st.session_state.indexed_files = []
 
-# ---- Сайдбар ----
+# ---- Sidebar ----
 with st.sidebar:
     st.header("📄 Документы")
 
@@ -256,7 +256,7 @@ with st.sidebar:
         st.session_state.indexed_files = []
         st.rerun()
 
-# ---- Основное окно ----
+# ---- Main area ----
 st.title("💬 Локальный RAG-чат")
 st.caption("Вопросы по вашим PDF и лог-файлам · ChromaDB + Ollama · всё работает локально")
 

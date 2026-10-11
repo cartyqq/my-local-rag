@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Локальный RAG: PDF -> чанки -> эмбеддинги (all-MiniLM-L6-v2) -> ChromaDB -> Ollama.
+Local RAG: PDF -> chunks -> embeddings (all-MiniLM-L6-v2) -> ChromaDB -> Ollama.
 
-Установка зависимостей:
+Install dependencies:
     pip install langchain-community langchain-text-splitters langchain-huggingface \
                 langchain-chroma chromadb sentence-transformers pypdf requests
 
-Перед запуском должен работать Ollama и быть скачана модель:
+Ollama must be running and the model must be pulled before launching:
     ollama pull llama3.2
 
-Примеры:
-    # индексация PDF
+Examples:
+    # index a PDF
     python main.py index document.pdf
 
-    # один вопрос
-    python main.py ask "О чём этот документ?"
+    # ask a single question
+    python main.py ask "What is this document about?"
 
-    # индексация + интерактивный чат
+    # index + interactive chat
     python main.py chat --pdf document.pdf
 """
 
@@ -29,7 +29,7 @@ from langchain_community.document_loaders import TextLoader
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# ----------------------------- Настройки ------------------------------------
+# ------------------------------- Settings -----------------------------------
 CHROMA_DIR = "./chroma_db"
 COLLECTION_NAME = "pdf_docs"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -52,7 +52,7 @@ PROMPT_TEMPLATE = """Ты — Senior DevOps инженер. Твоя задач�
 Отчет об ошибке и решение:"""
 
 
-# ------------------------------ Эмбеддинги ----------------------------------
+# ------------------------------- Embeddings ---------------------------------
 def get_embeddings() -> HuggingFaceEmbeddings:
     return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
@@ -65,13 +65,13 @@ def get_vectorstore() -> Chroma:
     )
 
 
-# ------------------------- 1. Загрузка и нарезка ----------------------------
+# ---------------------- 1. Loading and splitting ----------------------------
 def load_and_split(log_path: str):
-    # Используем TextLoader с указанием кодировки (логи часто пишутся в utf-8)
+    # Use TextLoader with an explicit encoding (logs are usually written in utf-8)
     loader = TextLoader(log_path, encoding="utf-8")
     pages = loader.load()
 
-    # Увеличиваем размер куска для захвата длинных Traceback и логов Docker
+    # Larger chunk size to capture long tracebacks and Docker logs
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1500,
         chunk_overlap=300,
@@ -82,7 +82,7 @@ def load_and_split(log_path: str):
     return chunks
 
 
-# ------------------- 2. Векторизация и сохранение в Chroma ------------------
+# ------------------ 2. Vectorization and saving to Chroma -------------------
 def index_pdf(pdf_path: str) -> None:
     chunks = load_and_split(pdf_path)
     if not chunks:
@@ -93,7 +93,7 @@ def index_pdf(pdf_path: str) -> None:
     print(f"Проиндексировано и сохранено в '{CHROMA_DIR}'.")
 
 
-# ------------------------- 3. Поиск и вопрос к Ollama -----------------------
+# ------------------------ 3. Search and querying Ollama ---------------------
 def ask_ollama(prompt: str) -> str:
     try:
         resp = requests.post(
@@ -130,7 +130,7 @@ def answer_question(question: str) -> str:
     return ask_ollama(prompt)
 
 
-# --------------------------------- CLI --------------------------------------
+# ---------------------------------- CLI -------------------------------------
 def chat_loop() -> None:
     print("Интерактивный режим. Пустая строка или 'exit' — выход.")
     while True:
